@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Karma Influencer</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <h1>Karma Influencer</h1>
+
+    <form id="scrapeForm">
+        <label for="keywords">Palabras clave (separadas por coma):</label><br>
+        <input type="text" id="keywords" name="keywords" required placeholder="elon musk, openai"><br><br>
+
+        <label for="limit">Límite por palabra clave:</label><br>
+        <input type="number" id="limit" name="limit" value="10" min="1" max="100"><br><br>
+
+        <button type="submit">Buscar en Reddit</button>
+    </form>
+
+    <div id="resultado"></div>
+
+    <div id="comments-container"></div>
+
+    <script>
+        document.getElementById("scrapeForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const keywords = document.getElementById("keywords").value.split(",").map(k => k.trim());
+            const limit = document.getElementById("limit").value;
+
+            const response = await fetch("/api/scrape/reddit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ keywords, limit })
+            });
+
+            const data = await response.json();
+            const resultadoDiv = document.getElementById("resultado");
+            resultadoDiv.innerHTML = `<p>${data.message || data.error}</p>`;
+
+            // Limpiar contenedor de comentarios antes de cargar nuevos
+            document.getElementById("comments-container").innerHTML = '';
+
+            // Obtener y mostrar comentarios para cada keyword
+            for (const keyword of keywords) {
+                const comments = await fetchComments(keyword);
+                renderComments(keyword, comments);
+            }
+        });
+
+        async function fetchComments(influencerName) {
+            const res = await fetch(`/api/comments/${encodeURIComponent(influencerName)}`);
+            if (!res.ok) {
+                console.error("No se encontraron comentarios para", influencerName);
+                return [];
+            }
+            const comments = await res.json();
+
+            return comments;
+        }
+
+        function renderComments(influencerName, comments) {
+            const container = document.getElementById('comments-container');
+
+            // Contenedor para cada influencer
+            let influencerDiv = document.getElementById(`influencer-${influencerName}`);
+            if (!influencerDiv) {
+                influencerDiv = document.createElement('div');
+                influencerDiv.id = `influencer-${influencerName}`;
+                influencerDiv.innerHTML = `<h2>Comentarios para: ${influencerName}</h2>`;
+                container.appendChild(influencerDiv);
+            }
+
+            // Limpiar comentarios previos de ese influencer
+            influencerDiv.innerHTML = `<h2>Comentarios para: ${influencerName}</h2>`;
+
+            comments.forEach(c => {
+                const div = document.createElement('div');
+                div.classList.add('comment');
+                div.innerHTML = `
+                    <p>${c.text}</p>
+                    <p>Sentimiento: <strong>${c.sentiment}</strong> (Score: ${c.score.toFixed(2)})</p>
+                    <p><small>${new Date(c.date).toLocaleString()}</small></p>
+                    <hr>
+                `;
+                influencerDiv.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
