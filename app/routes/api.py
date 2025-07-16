@@ -75,3 +75,34 @@ def get_comments(influencer_name):
         })
 
     return jsonify(comments_list), 200
+
+@bp.route('/analytics/<influencer>', methods=['GET'])
+def influencer_analytics(influencer):
+    comments = Comment.query.filter(Comment.influencer.has(name=influencer)).all()
+    if not comments:
+        return jsonify({"error": "No se encontraron comentarios"}), 404
+
+    pos = [c for c in comments if c.sentiment == "positivo"]
+    neg = [c for c in comments if c.sentiment == "negativo"]
+    neu = [c for c in comments if c.sentiment == "neutral"]
+    avg_score = sum(c.score for c in comments) / len(comments)
+
+    if avg_score > 0.25:
+        karma = "positivo"
+        recommendation = "Buena percepción general con apoyo sólido."
+    elif avg_score < -0.25:
+        karma = "negativo"
+        recommendation = "Percepción negativa predominante, influenciador en crisis de imagen."
+    else:
+        karma = "neutral"
+        recommendation = "Opiniones divididas. No hay una tendencia clara."
+
+    return jsonify({
+        "total": len(comments),
+        "positive": len(pos),
+        "neutral": len(neu),
+        "negative": len(neg),
+        "average_score": avg_score,
+        "karma_score": karma,
+        "recommendation": recommendation
+    })

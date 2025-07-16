@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Comentarios - Karma Influencer</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="/static/css/comments.css">
+</head>
+<body>
+
+    <div style="margin-bottom: 20px;">
+        <a href="/"><button>⬅ Volver a Inicio</button></a>
+    </div>    
+
+    <h1>Comentarios</h1>
+    <a href="/analytics.html" id="analytics-link">Ver Análisis</a>
+
+    <div id="comments-container"></div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const keywords = params.get("keywords")?.split(",") || [];
+
+        document.getElementById("analytics-link").href = `/analytics.html?keywords=${keywords.join(',')}`;
+
+        async function fetchComments(influencerName) {
+            const res = await fetch(`/api/comments/${encodeURIComponent(influencerName)}`);
+            if (!res.ok) return [];
+            return await res.json();
+        }
+
+        function renderComments(influencerName, comments) {
+            const container = document.getElementById('comments-container');
+
+            const div = document.createElement('div');
+            div.innerHTML = `<h2>Comentarios para: ${influencerName}</h2>`;
+            comments.forEach(c => {
+                div.innerHTML += `
+                    <div class="comment">
+                        <p>${c.text}</p>
+                        <p>Sentimiento: <strong>${c.sentiment}</strong> (Score: ${c.score.toFixed(2)})</p>
+                        <p><small>${new Date(c.date).toLocaleString()}</small></p>
+                        <hr>
+                    </div>
+                `;
+            });
+
+            container.appendChild(div);
+        }
+
+        async function loadComments() {
+            for (const keyword of keywords) {
+                const comments = await fetchComments(keyword);
+                renderComments(keyword, comments);
+            }
+        }
+
+        loadComments();
+    </script>
+</body>
+</html>
