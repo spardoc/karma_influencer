@@ -1,61 +1,81 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Comentarios - Karma Influencer</title>
-    <link rel="stylesheet" href="/static/css/common.css">
-    <link rel="stylesheet" href="/static/css/comments.css">
+    <link rel="stylesheet" href="/static/css/common.css" />
+    <link rel="stylesheet" href="/static/css/index.css" />
+    <link rel="stylesheet" href="/static/css/comments.css" />
 </head>
 <body>
 
-    <div style="margin-bottom: 20px;">
-        <a href="/"><button>⬅ Volver a Inicio</button></a>
-    </div>    
+    <header>
+        <div class="icon">🎭</div>
+        <h1>Karma Influencer</h1>
+    </header>
+    
+    <main class="form-container">
+        <a href="/" style="display: inline-block; margin-bottom: 20px;">
+            <button>⬅ Volver a Inicio</button>
+        </a>
+    
+        <h2>Comentarios</h2>
+    
+        <div id="comments-container"></div>
+    
+        <div class="navigation-buttons">
+            <button id="btn-analytics" disabled>Ver Análisis</button>
+        </div>
+    </main>    
 
-    <h1>Comentarios</h1>
-    <a href="/analytics.html" id="analytics-link">Ver Análisis</a>
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const keywords = params.get("keywords")?.split(",") || [];
 
-    <div id="comments-container"></div>
+    document.getElementById("btn-analytics").onclick = () => {
+        window.location.href = `/analytics.html?keywords=${keywords.join(",")}`;
+    };
 
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const keywords = params.get("keywords")?.split(",") || [];
+    async function fetchComments(influencerName) {
+        const res = await fetch(`/api/comments/${encodeURIComponent(influencerName)}`);
+        if (!res.ok) return [];
+        return await res.json();
+    }
 
-        document.getElementById("analytics-link").href = `/analytics.html?keywords=${keywords.join(',')}`;
+    function renderComments(influencerName, comments) {
+        const container = document.getElementById('comments-container');
 
-        async function fetchComments(influencerName) {
-            const res = await fetch(`/api/comments/${encodeURIComponent(influencerName)}`);
-            if (!res.ok) return [];
-            return await res.json();
+        const div = document.createElement('div');
+        div.innerHTML = `<h3>Comentarios para: ${influencerName}</h3>`;
+        comments.forEach(c => {
+            const sentimentClass = c.sentiment.toLowerCase(); // ej: "positivo", "negativo", "neutral"
+
+            div.innerHTML += `
+                <div class="comment ${sentimentClass}">
+                    <p>${c.text}</p>
+                    <p>Sentimiento: <strong>${c.sentiment}</strong> (Score: ${c.score.toFixed(2)})</p>
+                    <p><small>${new Date(c.date).toLocaleString()}</small></p>
+                </div>
+            `;
+
+        });
+
+        container.appendChild(div);
+    }
+
+    async function loadComments() {
+        if (keywords.length === 0) {
+            document.getElementById("comments-container").innerHTML = "<p>No se recibieron palabras clave.</p>";
+            return;
         }
-
-        function renderComments(influencerName, comments) {
-            const container = document.getElementById('comments-container');
-
-            const div = document.createElement('div');
-            div.innerHTML = `<h2>Comentarios para: ${influencerName}</h2>`;
-            comments.forEach(c => {
-                div.innerHTML += `
-                    <div class="comment">
-                        <p>${c.text}</p>
-                        <p>Sentimiento: <strong>${c.sentiment}</strong> (Score: ${c.score.toFixed(2)})</p>
-                        <p><small>${new Date(c.date).toLocaleString()}</small></p>
-                        <hr>
-                    </div>
-                `;
-            });
-
-            container.appendChild(div);
+        for (const keyword of keywords) {
+            const comments = await fetchComments(keyword);
+            renderComments(keyword, comments);
         }
+        document.getElementById("btn-analytics").disabled = false;
+    }
 
-        async function loadComments() {
-            for (const keyword of keywords) {
-                const comments = await fetchComments(keyword);
-                renderComments(keyword, comments);
-            }
-        }
-
-        loadComments();
-    </script>
+    loadComments();
+</script>
 </body>
 </html>

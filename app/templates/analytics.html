@@ -1,68 +1,126 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Análisis - Karma Influencer</title>
-    <link rel="stylesheet" href="/static/css/common.css">
-    <link rel="stylesheet" href="/static/css/analytics.css">
+    <link rel="stylesheet" href="/static/css/common.css" />
+    <link rel="stylesheet" href="/static/css/index.css" />
+    <link rel="stylesheet" href="/static/css/analytics.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-    <div style="margin-bottom: 20px;">
-        <a href="/"><button>⬅ Volver a Inicio</button></a>
-    </div>    
+<header>
+    <div class="icon">🎭</div>
+    <h1>Karma Influencer</h1>
+</header>
 
-    <h1>Análisis</h1>
-    <a href="/comments.html?keywords=" id="comments-link">Ver Comentarios</a>
+<main class="form-container" style="padding-top: 20px; min-height: calc(100vh - 110px);">
+
+    <h2>Análisis</h2>
+
+    <a href="/" style="display: inline-block; margin-bottom: 20px;">
+        <button>⬅ Volver a Inicio</button>
+    </a>
+
     <div id="analytics-container"></div>
 
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const keywords = params.get("keywords")?.split(",") || [];
+    <div class="navigation-buttons" style="margin-top: 30px; justify-content: center;">
+        <button id="btn-comments" disabled>Ver Comentarios</button>
+    </div>
+</main>
 
-        document.getElementById("comments-link").href = `/comments.html?keywords=${keywords.join(',')}`;
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const keywords = params.get("keywords")?.split(",") || [];
 
-        async function fetchAnalytics(keyword) {
-            const res = await fetch(`/api/analytics/${encodeURIComponent(keyword)}`);
-            return res.ok ? await res.json() : null;
-        }
+    document.getElementById("btn-comments").onclick = () => {
+        window.location.href = `/comments.html?keywords=${keywords.join(",")}`;
+    };
 
-        function renderAnalytics(keyword, data) {
-            const container = document.getElementById("analytics-container");
-            const div = document.createElement("div");
-            div.classList.add("analytics-section");
-            div.innerHTML = `
-                <h3>${keyword}</h3>
-                <canvas id="chart-${keyword}" width="300" height="300"></canvas>
-                <p><strong>Karma:</strong> ${data.karma_score}</p>
-                <p><strong>Promedio:</strong> ${data.average_score.toFixed(2)}</p>
-                <p><strong>Recomendación:</strong> ${data.recommendation}</p>
-                <hr>
-            `;
-            container.appendChild(div);
+    async function fetchAnalytics(keyword) {
+        const res = await fetch(`/api/analytics/${encodeURIComponent(keyword)}`);
+        return res.ok ? await res.json() : null;
+    }
 
-            new Chart(document.getElementById(`chart-${keyword}`), {
-                type: 'pie',
-                data: {
-                    labels: ['Positivo', 'Neutral', 'Negativo'],
-                    datasets: [{
-                        label: 'Sentimientos',
-                        data: [data.positive, data.neutral, data.negative],
-                        backgroundColor: ['#4caf50', '#9e9e9e', '#f44336'],
-                    }]
-                }
-            });
-        }
+    function renderAnalytics(keyword, data) {
+    const container = document.getElementById("analytics-container");
+    const div = document.createElement("div");
+    div.classList.add("analytics-section");
 
-        async function loadAnalytics() {
-            for (const keyword of keywords) {
-                const data = await fetchAnalytics(keyword);
-                if (data) renderAnalytics(keyword, data);
+    div.innerHTML = `
+        <h3>${keyword}</h3>
+        <div class="analytics-charts">
+            <canvas id="pie-chart-${keyword}" width="300" height="200"></canvas>
+            <canvas id="bar-chart-${keyword}" width="300" height="200"></canvas>
+        </div>
+        <div class="analytics-text">
+            <p><strong>Karma:</strong> ${data.karma_score}</p>
+            <p><strong>Promedio:</strong> ${data.average_score.toFixed(2)}</p>
+            <p><strong>Recomendación:</strong> ${data.recommendation}</p>
+        </div>
+        <div class="analytics-extra">
+            <!-- Puedes añadir más info aquí -->
+        </div>
+    `;
+    container.appendChild(div);
+
+    // Pie chart
+    new Chart(document.getElementById(`pie-chart-${keyword}`), {
+        type: 'pie',
+        data: {
+            labels: ['Positivo', 'Neutral', 'Negativo'],
+            datasets: [{
+                label: 'Sentimientos',
+                data: [data.positive, data.neutral, data.negative],
+                backgroundColor: ['#a0d6a0', '#888888', '#b94a4a'],
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { labels: { color: '#eee' } }
             }
         }
+    });
 
-        loadAnalytics();
-    </script>
+    // Bar chart
+    new Chart(document.getElementById(`bar-chart-${keyword}`), {
+        type: 'bar',
+        data: {
+            labels: ['Positivo', 'Neutral', 'Negativo'],
+            datasets: [{
+                label: 'Número de comentarios',
+                data: [data.positive, data.neutral, data.negative],
+                backgroundColor: ['#a0d6a0', '#888888', '#b94a4a'],
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            scales: {
+                x: { ticks: { color: '#ddd' }, grid: { display: false } },
+                y: { ticks: { color: '#ddd' }, grid: { color: '#444' } }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: true }
+            }
+        }
+    });
+}
+
+    async function loadAnalytics() {
+        if (keywords.length === 0) {
+            document.getElementById("analytics-container").innerHTML = "<p>No se recibieron palabras clave.</p>";
+            return;
+        }
+        for (const keyword of keywords) {
+            const data = await fetchAnalytics(keyword);
+            if (data) renderAnalytics(keyword, data);
+        }
+        document.getElementById("btn-comments").disabled = false;
+    }
+
+    loadAnalytics();
+</script>
 </body>
 </html>
