@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8" />
     <title>Karma Influencer - Buscar</title>
     <link rel="stylesheet" href="/static/css/common.css" />
     <link rel="stylesheet" href="/static/css/index.css" />
 </head>
+
 <body>
 
     <header>
@@ -47,10 +49,15 @@
     </main>
 
     <script>
-        document.getElementById("scrapeForm").addEventListener("submit", async function(e) {
+        document.getElementById("scrapeForm").addEventListener("submit", async function (e) {
             e.preventDefault();
-            const keywords = document.getElementById("keywords").value.split(",").map(k => k.trim()).filter(k => k.length > 0);
-            const limit = document.getElementById("limit").value;
+
+            const keywords = document.getElementById("keywords").value
+                .split(",")
+                .map(k => k.trim())
+                .filter(k => k.length > 0);
+            const limit = parseInt(document.getElementById("limit").value);
+            const platform = document.getElementById("platform").value;
 
             if (keywords.length === 0) {
                 document.getElementById("resultado").innerHTML = "<p>Por favor ingresa al menos una palabra clave.</p>";
@@ -59,23 +66,71 @@
 
             localStorage.setItem("keywords", JSON.stringify(keywords));
 
-            const response = await fetch("/api/scrape/reddit", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ keywords, limit })
-            });
+            document.getElementById("resultado").innerHTML = "<p>⌛ Procesando scraping...</p>";
 
-            const data = await response.json();
+            try {
+                let apiUrl = "";
+                let payload = {};
+                let messages = [];
 
-            if (data.error) {
-                document.getElementById("resultado").innerHTML = `<p style="color:red;">${data.error}</p>`;
-                return;
+                if (platform === "reddit") {
+                    apiUrl = "/api/scrape/reddit";
+                    payload = { keywords, limit };
+                    const res = await fetch(apiUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error);
+                    messages.push(data.message);
+                }
+
+                else if (platform === "tiktok") {
+                    for (const keyword of keywords) {
+                        const res = await fetch("/api/scrape/tiktok", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ query: keyword, limit })
+                        });
+                        const data = await res.json();
+                        if (data.error) throw new Error(data.error);
+                        messages.push(data.message);
+                    }
+                }
+
+                else if (platform === "all") {
+                    // Procesar Reddit
+                    const redditRes = await fetch("/api/scrape/reddit", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ keywords, limit })
+                    });
+                    const redditData = await redditRes.json();
+                    if (redditData.error) throw new Error(redditData.error);
+                    messages.push(redditData.message);
+
+                    // Procesar TikTok uno por uno
+                    for (const keyword of keywords) {
+                        const res = await fetch("/api/scrape/tiktok", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ query: keyword, limit })
+                        });
+                        const data = await res.json();
+                        if (data.error) throw new Error(data.error);
+                        messages.push(data.message);
+                    }
+                }
+
+                document.getElementById("resultado").innerHTML = messages.map(m => `<p>${m}</p>`).join("");
+
+                const query = new URLSearchParams({ keywords: keywords.join(",") }).toString();
+                window.location.href = `/comments.html?${query}`;
+            } catch (err) {
+                console.error(err);
+                document.getElementById("resultado").innerHTML = `<p style="color:red;">${err.message}</p>`;
             }
-
-            document.getElementById("resultado").innerHTML = `<p>${data.message}</p>`;
-
-            const query = new URLSearchParams({ keywords: keywords.join(",") }).toString();
-            window.location.href = `/comments.html?${query}`;
         });
 
         window.addEventListener("DOMContentLoaded", () => {
@@ -92,5 +147,7 @@
         });
     </script>
 
+
 </body>
+
 </html>

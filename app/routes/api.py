@@ -4,8 +4,64 @@ from app.openai_client import OpenAIClient
 from app.models import db, Comment, Influencer
 from app.services.cleaner import TextCleaner
 from datetime import datetime
+from app.scrapers.tiktok import scrape_tiktok
+
 
 bp = Blueprint('api', __name__, url_prefix='/api')
+
+
+@bp.route('/scrape/tiktok', methods=['POST'])
+def scrape_tiktok_route():
+    data = request.json
+    query = data.get('query')
+    limit = int(data.get('limit', 5))
+
+    if not query:
+        return jsonify({"error": "Debe proporcionar una búsqueda (hashtag o usuario)"}), 400
+
+    # Scrapea los comentarios desde TikTok
+    try:
+        comments_data = scrape_tiktok(query=query, num_videos=limit)
+    except Exception as e:
+        return jsonify({"error": f"Error al scrapear TikTok: {str(e)}"}), 500
+
+    if not comments_data:
+        return jsonify({"message": "No se encontraron comentarios"}), 200
+
+    gpt = OpenAIClient()
+    influencer_name = query.replace("#", "").replace("@", "")
+
+    influencer = Influencer.query.filter_by(name=influencer_name).first()
+    if not influencer:
+        influencer = Influencer(name=influencer_name, last_scrape=datetime.utcnow())
+        db.session.add(influencer)
+        db.session.commit()
+
+    result_count = 0
+    for comment_obj in comments_data:
+        full_text = f"{comment_obj['title']} {comment_obj['text']}".strip()
+        print(f"🧠 Analizando sentimiento para: {full_text[:80]}...")
+
+        sentiment, score = gpt.analyze_sentiment(full_text)
+        print(f"→ Sentimiento: {sentiment} (Score={score})")
+
+        comment = Comment(
+            influencer_id=influencer.id,
+            platform='tiktok',
+            date=datetime.utcnow(),
+            text=comment_obj['text'],
+            sentiment=sentiment,
+            score=score
+        )
+        db.session.add(comment)
+        result_count += 1
+
+    db.session.commit()
+
+    return jsonify({
+        "message": f"{result_count} comentarios de TikTok procesados.",
+        "query": query
+    }), 200
 
 @bp.route('/scrape/reddit', methods=['POST'])
 def scrape_reddit():

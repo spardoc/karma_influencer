@@ -1,51 +1,61 @@
-import asyncio 
+from playwright.sync_api import sync_playwright
 import pandas as pd
-from TikTokApi import TikTokApi
+import time
 
-async def main():
-    ms_token = "wE4f4j5CaOlHQ7hu15-Ccs4VO93D-BhHZBDi5iLwzbulZ3_UJ0-7Ew4C3Wb1yWjRGzZxI80DkPiqHpuFXcWzwHikAYkGnJgZ9TrhW0KdA3Lj3cCsxWPPSaBdtiebOg2fM8I6qJTBiirehw=="
+def scrape_tiktok(query: str, num_videos: int = 5):
+    comments_list = []
 
-    api = TikTokApi()
-    await api.create_sessions(
-        ms_tokens=[ms_token],
-        num_sessions=1,
-        headless=True,
-        timeout=60000
-    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch_persistent_context(
+            user_data_dir="user_data",
+            headless=False,
+            viewport={"width": 1200, "height": 800}
+        )
 
-    print("✅ Sesión iniciada con msToken.")
+        page = browser.new_page()
 
-    hashtag_name = "shakira"
-    hashtag = api.hashtag(name=hashtag_name)
-    videos = hashtag.videos(count=30)
+        url = f"https://www.tiktok.com/tag/{query}" if not query.startswith("@") else f"https://www.tiktok.com/{query}"
+        page.goto(url, timeout=60000)
+        time.sleep(3)
 
-    resultados = []
+        page.wait_for_selector('div[data-e2e="challenge-item-list"]', timeout=20000)
+        videos = page.locator('div[id="column-item-video-container"]')
+        total = min(videos.count(), num_videos)
 
-    async for video in videos:
-        try:
-            video_url = f"https://www.tiktok.com/@{video.author.username}/video/{video.id}"
+        for idx in range(total):
+            try:
+                videos.nth(idx).click()
+                time.sleep(4)
 
-            # Obtener los comentarios 
-            comments = []
-            async for comment in video.comments(count=100):
-                comments.append(comment.as_dict.get("text", ""))
+                try:
+                    title = page.locator('span[data-e2e="new-desc-span"]').nth(0).inner_text()
+                except:
+                    title = "Sin título"
 
-            info = {
-                #"usuario": video.author.username,
-                #"descripcion": video.as_dict.get("desc", ""),
-                #"video_id": video.id,
-                #"url": video_url,
-                "comentarios": " | ".join(comments)  # Comentarios separados por |
-            }
-            resultados.append(info)
+                page.wait_for_selector('div[data-e2e="search-comment-container"]', timeout=10000)
+                for _ in range(5):
+                    page.mouse.wheel(0, 1200)
+                    time.sleep(1.2)
 
-        except Exception as e:
-            print(f"❌ Error procesando video: {e}")
+                comments = page.locator('div[data-e2e="search-comment-container"] p[data-e2e="comment-level-1"] span[dir]')
+                for i in range(comments.count()):
+                    text = comments.nth(i).inner_text()
+                    comments_list.append({
+                        "query": query,
+                        "title": title,
+                        "text": text
+                    })
 
-    # Guardar resultados en CSV
-    df = pd.DataFrame(resultados)
-    df.to_csv(f"videosprueba3_{hashtag_name}.csv", index=False, encoding="utf-8-sig")
-    print(f"📁 Archivo guardado como videosprueba3_{hashtag_name}.csv")
+            except Exception as e:
+                print(f"⚠️ Error en video {idx+1}: {e}")
+                continue
 
-if __name__ == "__main__":
-    asyncio.run(main())
+            if idx < total - 1:
+                page.go_back()
+                time.sleep(2)
+                page.wait_for_selector('div[data-e2e="challenge-item-list"]', timeout=10000)
+                videos = page.locator('div[id="column-item-video-container"]')
+
+        browser.close()
+
+    return comments_list
