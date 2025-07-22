@@ -3,7 +3,7 @@ import pandas as pd
 from TikTokApi import TikTokApi
 
 async def main():
-    ms_token = "wE4f4j5CaOlHQ7hu15-Ccs4VO93D-BhHZBDi5iLwzbulZ3_UJ0-7Ew4C3Wb1yWjRGzZxI80DkPiqHpuFXcWzwHikAYkGnJgZ9TrhW0KdA3Lj3cCsxWPPSaBdtiebOg2fM8I6qJTBiirehw=="
+    ms_token = "tokenms"
 
     api = TikTokApi()
     await api.create_sessions(
